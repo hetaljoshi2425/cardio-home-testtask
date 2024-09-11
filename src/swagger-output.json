@@ -1,0 +1,357 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Cardio Hometask APIs",
+    "description": "APIs for managing clients and contracts",
+    "version": "1.0.0"
+  },
+  "host": "localhost:3001",
+  "basePath": "/",
+  "schemes": ["http"],
+  "securityDefinitions": {
+    "profileIdHeader": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "profile_id",
+      "description": "Profile ID used for profile validation."
+    }
+  },
+  "security": [
+    {
+      "profileIdHeader": []
+    }
+  ],
+  "paths": {
+    "/contracts/{id}": {
+      "get": {
+        "summary": "Get contract by ID",
+        "description": "Returns a specific contract based on the provided ID. The contract is retrieved if it belongs to the profile ID of the authenticated user (either as a client or contractor).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "ID of the contract to retrieve."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract found and returned successfully."
+          },
+          "401": {
+            "description": "Unauthorized Access (Profile validation failed). The profile ID does not have access to this contract."
+          },
+          "404": {
+            "description": "No Contract found for this user. The contract with the provided ID does not exist or does not belong to the authenticated user."
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while retrieving the contract."
+          }
+        }
+      }
+    },
+    "/contracts": {
+      "get": {
+        "summary": "Get all active contracts for the authenticated user",
+        "description": "Retrieves all contracts associated with the authenticated user (either as a client or contractor) that are not terminated. The profile ID is used to filter contracts relevant to the user.",
+        "responses": {
+          "200": {
+            "description": "Contracts found and returned successfully."
+          },
+          "401": {
+            "description": "Unauthorized Access (Profile validation failed). The profile ID does not have access to any contracts."
+          },
+          "404": {
+            "description": "No Contracts found. The authenticated user does not have any active contracts."
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while retrieving the contracts."
+          }
+        }
+      }
+    },
+    "/jobs/unpaid": {
+      "get": {
+        "summary": "Get all unpaid jobs for active contracts of the authenticated user",
+        "description": "Retrieves all unpaid jobs associated with active contracts of the authenticated user. Active contracts are those with a status of 'in_progress'. Jobs are considered unpaid if their 'paid' status is not true. Requires a profile ID to validate the user's access.",
+        "responses": {
+          "200": {
+            "description": "Unpaid jobs found and returned successfully."
+          },
+          "401": {
+            "description": "Unauthorized Access (Profile validation failed). The profile ID does not have access to any unpaid jobs."
+          },
+          "404": {
+            "description": "No Unpaid Jobs found. The authenticated user does not have any unpaid jobs associated with their active contracts."
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while retrieving the unpaid jobs."
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}/pay": {
+      "post": {
+        "summary": "Pay for a job",
+        "description": "Processes payment for the specified job. The endpoint ensures that the job exists, the client has sufficient balance, and the job has not been paid previously. It updates the client's and contractor's balances and marks the job as paid.",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "ID of the job to pay for."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment for the job was successfully completed."
+          },
+          "400": {
+            "description": "Bad Request. This could be due to invalid job ID, insufficient balance, or the job has already been paid."
+          },
+          "401": {
+            "description": "Unauthorized. The client does not have permission to pay for this job."
+          },
+          "404": {
+            "description": "Not Found. The specified job or related entities (such as the contract or profiles) were not found."
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while processing the payment."
+          }
+        }
+      }
+    },
+    "/balances/deposit/{userId}": {
+      "post": {
+        "summary": "Deposit amount into client account",
+        "description": "Allows a client to deposit an amount into their account. The deposit is limited to 25% of the total unpaid job amount associated with the client. The endpoint checks authorization, calculates the limit, and updates the client’s balance accordingly.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "ID of the client for whom the deposit is made."
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "depositAmount": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "The amount to be deposited into the client’s account.",
+                  "example": 100.5
+                }
+              },
+              "required": ["depositAmount"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deposit was successful.",
+            "schema": {
+              "type": "string",
+              "example": "Deposit successful"
+            }
+          },
+          "400": {
+            "description": "Bad Request. This can occur if the deposit amount exceeds 25% of total unpaid jobs or if the deposit amount is invalid.",
+            "schema": {
+              "type": "string",
+              "example": "Deposit amount exceeds 25% of total unpaid jobs"
+            }
+          },
+          "401": {
+            "description": "Unauthorized access. The client does not have permission to make this deposit.",
+            "schema": {
+              "type": "string",
+              "example": "Unauthorized access"
+            }
+          },
+          "404": {
+            "description": "Not Found. The specified client was not found.",
+            "schema": {
+              "type": "string",
+              "example": "Client not found"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while processing the deposit.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Internal server error"
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Detailed error message"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/best-profession": {
+      "get": {
+        "summary": "Get the best-paying profession",
+        "description": "Retrieves the profession that has earned the most money within the specified date range. The results are based on jobs that have been paid and their associated contractors' professions. The date range must be provided in ISO format.",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date-time",
+            "description": "Start date of the range in ISO format (e.g., '2024-01-01T00:00:00Z')."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date-time",
+            "description": "End date of the range in ISO format (e.g., '2024-01-31T23:59:59Z')."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The best-paying profession and its earnings.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "profession": {
+                  "type": "string",
+                  "description": "The profession that earned the most money."
+                },
+                "earnings": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Total earnings of the best-paying profession within the specified date range.",
+                  "example": 5000.75
+                }
+              },
+              "required": ["profession", "earnings"]
+            }
+          },
+          "400": {
+            "description": "Bad Request. Both 'start' and 'end' dates must be provided.",
+            "schema": {
+              "type": "string",
+              "example": "start and end dates are required"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while processing the request.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Internal server error"
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Detailed error message"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/admin/best-clients": {
+      "get": {
+        "summary": "Get the top clients based on payments",
+        "description": "Retrieves the top clients who have made the highest payments within the specified date range. Results are sorted by total payment amount, and the number of clients returned is limited by the 'limit' query parameter.",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date-time",
+            "description": "Start date of the range in ISO format (e.g., '2024-01-01T00:00:00Z')."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date-time",
+            "description": "End date of the range in ISO format (e.g., '2024-01-31T23:59:59Z')."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of top clients to return. Default is 2.",
+            "example": 5
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of top clients based on payment amount.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Client ID."
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "description": "Full name of the client."
+                  },
+                  "paid": {
+                    "type": "number",
+                    "format": "float",
+                    "description": "Total amount paid by the client within the specified date range.",
+                    "example": 1200.75
+                  }
+                },
+                "required": ["id", "fullName", "paid"]
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Both 'start' and 'end' dates must be provided.",
+            "schema": {
+              "type": "string",
+              "example": "Start and end dates are required"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error. An unexpected error occurred while processing the request.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Internal server error"
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Detailed error message"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
